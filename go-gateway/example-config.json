@@ -1,0 +1,59 @@
+{
+  "routes": [
+    {
+      "id": "service-a",
+      "uri": "http://localhost:9090",
+      "predicates": [
+        {
+          "name": "Path",
+          "args": {
+            "pattern": "/api/service-a/**"
+          }
+        }
+      ],
+      "filters": [
+        {
+          "name": "RateLimiter",
+          "args": {
+            "permitsPerSecond": 100,
+            "burstCapacity": 200
+          }
+        }
+      ],
+      "order": 1,
+      "metadata": {
+        "description": "Service A route"
+      }
+    },
+    {
+      "id": "service-b",
+      "uri": "http://localhost:9091",
+      "predicates": [
+        {
+          "name": "Path",
+          "args": {
+            "pattern": "/api/service-b/**"
+          }
+        }
+      ],
+      "order": 2,
+      "metadata": {
+        "description": "Service B route"
+      }
+    }
+  ],
+  "global_filters": [
+    {
+      "name": "GlobalLogFilter"
+    },
+    {
+      "name": "GlobalMetricsFilter",
+      "args": {
+        "enabled": true
+      }
+    }
+  ],
+  "port": 8080,
+  "notes": "Note: Gateway listening port (port) must be different from backend service port (uri) to avoid circular calls or port conflicts"
+
+}
