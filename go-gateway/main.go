@@ -15,6 +15,7 @@ import (
 	"go-gateway/pkg/config"
 	"go-gateway/pkg/loadbalancer"
 	"go-gateway/pkg/middleware"
+	"go-gateway/pkg/monitoring"
 )
 
 // Gateway represents gateway instance
@@ -74,6 +75,8 @@ func (g *Gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Match route
 	matchedRoute := g.router.Match(r.URL.Path)
 	if matchedRoute == nil {
+		// Increment error counter for unmatched routes
+		monitoring.ErrorTotal.WithLabelValues("route_not_found", "unknown").Inc()
 		http.NotFound(w, r)
 		return
 	}
@@ -105,6 +108,8 @@ func (g *Gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			chosenServer := g.loadBalancer.ChooseServer(servers)
 			if chosenServer != nil {
 				targetURL = chosenServer.URL
+				// Record backend request
+				monitoring.BackendRequestTotal.WithLabelValues(chosenServer.URL, matchedRoute.ID).Inc()
 			}
 		}
 	}
@@ -112,6 +117,8 @@ func (g *Gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Parse target URL
 	target, err := url.Parse(targetURL)
 	if err != nil {
+		// Increment error counter for invalid target URL
+		monitoring.ErrorTotal.WithLabelValues("invalid_target_url", matchedRoute.ID).Inc()
 		http.Error(w, "Invalid target URL", http.StatusInternalServerError)
 		return
 	}
@@ -178,6 +185,10 @@ func main() {
 	gateway.configManager.SetConfig(defaultConfig)
 	gateway.reloadRoutes()
 
+	// Add metrics middleware
+	metricsMiddleware := monitoring.NewMetricsMiddleware()
+	gateway.middlewares = append(gateway.middlewares, metricsMiddleware)
+
 	// Enable config watching for hot updates
 	go func() {
 		gateway.configManager.WatchConfig(func() {
@@ -186,7 +197,16 @@ func main() {
 		})
 	}()
 
+	// Start monitoring service on port 9090
+	monitoringService := monitoring.NewMonitoringService(9090)
+	go func() {
+		if err := monitoringService.Start(); err != nil {
+			log.Printf("Monitoring service error: %v", err)
+		}
+	}()
+
 	log.Println("Starting gateway on :8080")
+	log.Println("Monitoring endpoint available at :9090/metrics")
 	if err := gateway.Run(8080); err != nil {
 		log.Fatal("Gateway failed to start: ", err)
 	}

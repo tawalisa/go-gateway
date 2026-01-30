@@ -46,6 +46,12 @@ A high-performance API gateway based on Go language, similar to Spring Cloud Gat
 - **Environment Variables**: Seamlessly integrates with environment variables
 - **Default Values**: Supports default configuration values
 
+### 5. Monitoring System
+- **Prometheus Integration**: Exposes metrics in Prometheus format
+- **Key Metrics**: Request count, response time, active connections, route hits, error rates
+- **Monitoring Endpoint**: Available at `/metrics` on port 9090 by default
+- **Grafana Ready**: Metrics formatted for easy visualization with Grafana
+
 ## 快速开始
 
 ### Prerequisites
@@ -84,6 +90,19 @@ The gateway listens on port 8080 by default, you can modify this setting through
 
 See [example-config.json](example-config.json) or [example-viper-config.json](example-viper-config.json) file.
 
+## Monitoring
+
+The gateway exposes Prometheus metrics at `http://localhost:9090/metrics`. Key metrics include:
+
+- `gateway_requests_total`: Total number of requests processed
+- `gateway_request_duration_seconds`: Request duration histogram
+- `gateway_active_connections`: Current number of active connections
+- `gateway_backend_requests_total`: Total requests to backend services
+- `gateway_route_hits_total`: Hits per route
+- `gateway_errors_total`: Error counts by type
+
+For more details about monitoring, see [MONITORING_GUIDE.md](MONITORING_GUIDE.md).
+
 ## Usage Instructions
 
 For detailed usage instructions, please refer to [USAGE.md](USAGE.md) document.
@@ -95,15 +114,20 @@ go-gateway/
 ├── main.go                 # 主应用程序入口
 ├── README.md              # 项目说明
 ├── USAGE.md               # 使用说明
+├── CONFIG_GUIDE.md        # 配置管理指南
+├── MONITORING_GUIDE.md    # 监控系统指南
 ├── example-config.json    # 示例配置文件
 ├── example-viper-config.json # Viper配置示例文件
+├── prometheus.yml         # Prometheus配置示例
 ├── start-gateway.bat      # Windows启动脚本
 ├── go.mod                # Go模块文件
 ├── go.sum                # Go依赖校验文件
 ├── pkg/                  # 功能包
+│   ├── common/           # 公共类型定义
 │   ├── config/           # 配置管理
 │   ├── loadbalancer/     # 负载均衡器
 │   ├── middleware/       # 中间件系统
+│   ├── monitoring/       # 监控系统
 │   └── route/            # 路由管理
 └── tests/                # 测试文件
 ```
