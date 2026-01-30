@@ -1,25 +1,25 @@
 package config
 
 import (
-	"encoding/json"
-	"io/ioutil"
-	"os"
+	"fmt"
 	"sync"
 
+	"github.com/fsnotify/fsnotify"
+	"github.com/spf13/viper"
 	"go-gateway/pkg/common"
 )
 
 // Config defines configuration structure
 type Config struct {
-	Routes        []common.Route `json:"routes"`
-	GlobalFilters []GlobalFilter `json:"global_filters"`
-	Port          int            `json:"port"`
+	Routes        []common.Route `json:"routes" mapstructure:"routes"`
+	GlobalFilters []GlobalFilter `json:"global_filters" mapstructure:"global_filters"`
+	Port          int            `json:"port" mapstructure:"port"`
 }
 
 // GlobalFilter defines global filter
 type GlobalFilter struct {
-	Name string      `json:"name"`
-	Args interface{} `json:"args"`
+	Name string      `json:"name" mapstructure:"name"`
+	Args interface{} `json:"args" mapstructure:"args"`
 }
 
 // ConfigManager configuration manager interface
@@ -34,137 +34,162 @@ type ConfigManager interface {
 	SetConfig(config Config)
 }
 
-// StaticConfigManager static configuration manager
-type StaticConfigManager struct {
+// ViperConfigManager viper-based configuration manager
+type ViperConfigManager struct {
 	mutex  sync.RWMutex
 	config Config
+	viper  *viper.Viper
 }
 
-// NewStaticConfigManager creates a new static config manager
-func NewStaticConfigManager() *StaticConfigManager {
-	return &StaticConfigManager{
+// NewViperConfigManager creates a new viper config manager
+func NewViperConfigManager() *ViperConfigManager {
+	v := viper.New()
+	return &ViperConfigManager{
 		config: Config{
 			Routes:        make([]common.Route, 0),
 			GlobalFilters: make([]GlobalFilter, 0),
 			Port:          8080, // 默认端口
 		},
+		viper: v,
 	}
 }
 
-// Load loads config from file
-func (scm *StaticConfigManager) Load(configPath string) error {
-	scm.mutex.Lock()
-	defer scm.mutex.Unlock()
+// Load loads config from file using viper
+func (vcm *ViperConfigManager) Load(configPath string) error {
+	vcm.viper.SetConfigFile(configPath)
 
-	data, err := ioutil.ReadFile(configPath)
-	if err != nil {
-		return err
+	if err := vcm.viper.ReadInConfig(); err != nil {
+		return fmt.Errorf("error reading config file: %w", err)
 	}
 
-	err = json.Unmarshal(data, &scm.config)
-	if err != nil {
-		return err
+	// 将配置解码到结构体中
+	var config Config
+	if err := vcm.viper.Unmarshal(&config); err != nil {
+		return fmt.Errorf("error unmarshaling config: %w", err)
+	}
+
+	vcm.mutex.Lock()
+	defer vcm.mutex.Unlock()
+	vcm.config = config
+
+	return nil
+}
+
+// Save saves config to file using viper
+func (vcm *ViperConfigManager) Save(configPath string) error {
+	vcm.mutex.RLock()
+	defer vcm.mutex.RUnlock()
+
+	// 设置配置值
+	vcm.viper.Set("routes", vcm.config.Routes)
+	vcm.viper.Set("global_filters", vcm.config.GlobalFilters)
+	vcm.viper.Set("port", vcm.config.Port)
+
+	// 写入文件
+	if err := vcm.viper.WriteConfigAs(configPath); err != nil {
+		// 如果配置文件不存在，使用SafeWriteConfigAs创建它
+		if err := vcm.viper.SafeWriteConfigAs(configPath); err != nil {
+			return fmt.Errorf("error saving config file: %w", err)
+		}
 	}
 
 	return nil
 }
 
-// Save saves config to file
-func (scm *StaticConfigManager) Save(configPath string) error {
-	scm.mutex.RLock()
-	defer scm.mutex.RUnlock()
-
-	data, err := json.MarshalIndent(scm.config, "", "  ")
-	if err != nil {
-		return err
-	}
-
-	return ioutil.WriteFile(configPath, data, 0644)
-}
-
 // GetRoutes gets all routes
-func (scm *StaticConfigManager) GetRoutes() []common.Route {
-	scm.mutex.RLock()
-	defer scm.mutex.RUnlock()
+func (vcm *ViperConfigManager) GetRoutes() []common.Route {
+	vcm.mutex.RLock()
+	defer vcm.mutex.RUnlock()
 
 	// 返回副本以避免外部修改
-	routes := make([]common.Route, len(scm.config.Routes))
-	copy(routes, scm.config.Routes)
+	routes := make([]common.Route, len(vcm.config.Routes))
+	copy(routes, vcm.config.Routes)
 	return routes
 }
 
 // AddRoute adds a route
-func (scm *StaticConfigManager) AddRoute(route common.Route) {
-	scm.mutex.Lock()
-	defer scm.mutex.Unlock()
+func (vcm *ViperConfigManager) AddRoute(route common.Route) {
+	vcm.mutex.Lock()
+	defer vcm.mutex.Unlock()
 
 	// 检查是否已存在相同ID的路由
-	for i, r := range scm.config.Routes {
+	for i, r := range vcm.config.Routes {
 		if r.ID == route.ID {
 			// 如果存在，则替换
-			scm.config.Routes[i] = route
+			vcm.config.Routes[i] = route
 			return
 		}
 	}
 
 	// 添加新路由
-	scm.config.Routes = append(scm.config.Routes, route)
+	vcm.config.Routes = append(vcm.config.Routes, route)
 }
 
 // UpdateRoute updates a route
-func (scm *StaticConfigManager) UpdateRoute(route common.Route) error {
-	scm.mutex.Lock()
-	defer scm.mutex.Unlock()
+func (vcm *ViperConfigManager) UpdateRoute(route common.Route) error {
+	vcm.mutex.Lock()
+	defer vcm.mutex.Unlock()
 
-	for i, r := range scm.config.Routes {
+	for i, r := range vcm.config.Routes {
 		if r.ID == route.ID {
-			scm.config.Routes[i] = route
+			vcm.config.Routes[i] = route
 			return nil
 		}
 	}
 
-	return os.ErrNotExist
+	return fmt.Errorf("route with id %s not found", route.ID)
 }
 
 // DeleteRoute deletes a route
-func (scm *StaticConfigManager) DeleteRoute(id string) error {
-	scm.mutex.Lock()
-	defer scm.mutex.Unlock()
+func (vcm *ViperConfigManager) DeleteRoute(id string) error {
+	vcm.mutex.Lock()
+	defer vcm.mutex.Unlock()
 
-	for i, route := range scm.config.Routes {
+	for i, route := range vcm.config.Routes {
 		if route.ID == id {
 			// 从切片中移除元素
-			scm.config.Routes = append(scm.config.Routes[:i], scm.config.Routes[i+1:]...)
+			vcm.config.Routes = append(vcm.config.Routes[:i], vcm.config.Routes[i+1:]...)
 			return nil
 		}
 	}
 
-	return os.ErrNotExist
+	return fmt.Errorf("route with id %s not found", id)
 }
 
 // GetConfig gets full config
-func (scm *StaticConfigManager) GetConfig() Config {
-	scm.mutex.RLock()
-	defer scm.mutex.RUnlock()
+func (vcm *ViperConfigManager) GetConfig() Config {
+	vcm.mutex.RLock()
+	defer vcm.mutex.RUnlock()
 
 	// 返回副本
-	config := scm.config
+	config := vcm.config
 
 	// 复制路由切片
-	config.Routes = make([]common.Route, len(scm.config.Routes))
-	copy(config.Routes, scm.config.Routes)
+	config.Routes = make([]common.Route, len(vcm.config.Routes))
+	copy(config.Routes, vcm.config.Routes)
 
 	// 复制全局过滤器切片
-	config.GlobalFilters = make([]GlobalFilter, len(scm.config.GlobalFilters))
-	copy(config.GlobalFilters, scm.config.GlobalFilters)
+	config.GlobalFilters = make([]GlobalFilter, len(vcm.config.GlobalFilters))
+	copy(config.GlobalFilters, vcm.config.GlobalFilters)
 
 	return config
 }
 
 // SetConfig sets full config
-func (scm *StaticConfigManager) SetConfig(config Config) {
-	scm.mutex.Lock()
-	defer scm.mutex.Unlock()
+func (vcm *ViperConfigManager) SetConfig(config Config) {
+	vcm.mutex.Lock()
+	defer vcm.mutex.Unlock()
 
-	scm.config = config
+	vcm.config = config
+}
+
+// 监听配置变化的功能
+func (vcm *ViperConfigManager) WatchConfig(onChange func()) {
+	vcm.viper.OnConfigChange(func(e fsnotify.Event) {
+		fmt.Println("Config file changed:", e.Name)
+		if onChange != nil {
+			onChange()
+		}
+	})
+	vcm.viper.WatchConfig()
 }

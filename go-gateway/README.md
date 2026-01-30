@@ -6,7 +6,7 @@ A high-performance API gateway based on Go language, similar to Spring Cloud Gat
 
 - 🚀 **High Performance**: Based on Go language's concurrency advantage
 - 🔧 **Extensible**: Modular design, easy to extend
-- 📝 **Easy Configuration**: Supports JSON format configuration
+- 📝 **Easy Configuration**: Supports multiple formats (JSON, YAML, TOML, etc.) via Viper
 - 📊 **Observability**: Built-in monitoring and logging functions
 - ✅ **High Reliability**: Complete test coverage
 
@@ -40,8 +40,11 @@ A high-performance API gateway based on Go language, similar to Spring Cloud Gat
 - Middleware chained calls
 
 ### 4. Configuration Management
-- JSON format configuration file
-- Configuration hot update support
+- **Multiple Format Support**: Supports JSON, YAML, TOML, INI, env files via Viper
+- **Configuration Hot Update**: Automatically reloads configuration upon file changes
+- **Remote Configuration**: Supports remote configuration sources (etcd, Consul, etc.)
+- **Environment Variables**: Seamlessly integrates with environment variables
+- **Default Values**: Supports default configuration values
 
 ## 快速开始
 
@@ -79,7 +82,7 @@ The gateway listens on port 8080 by default, you can modify this setting through
 
 ## Configuration Example
 
-See [example-config.json](example-config.json) file.
+See [example-config.json](example-config.json) or [example-viper-config.json](example-viper-config.json) file.
 
 ## Usage Instructions
 
@@ -93,6 +96,7 @@ go-gateway/
 ├── README.md              # 项目说明
 ├── USAGE.md               # 使用说明
 ├── example-config.json    # 示例配置文件
+├── example-viper-config.json # Viper配置示例文件
 ├── start-gateway.bat      # Windows启动脚本
 ├── go.mod                # Go模块文件
 ├── go.sum                # Go依赖校验文件

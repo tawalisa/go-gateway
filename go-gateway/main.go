@@ -19,7 +19,7 @@ import (
 
 // Gateway represents gateway instance
 type Gateway struct {
-	configManager *config.StaticConfigManager
+	configManager *config.ViperConfigManager
 	router        *route.Router
 	loadBalancer  loadbalancer.LoadBalancer
 	middlewares   []middleware.Middleware
@@ -29,7 +29,7 @@ type Gateway struct {
 // NewGateway creates new gateway instance
 func NewGateway() *Gateway {
 	return &Gateway{
-		configManager: config.NewStaticConfigManager(),
+		configManager: config.NewViperConfigManager(),
 		router:        route.NewRouter(),
 		loadBalancer:  loadbalancer.NewRoundRobinBalancer(),
 		middlewares:   make([]middleware.Middleware, 0),
@@ -177,6 +177,14 @@ func main() {
 	}
 	gateway.configManager.SetConfig(defaultConfig)
 	gateway.reloadRoutes()
+
+	// Enable config watching for hot updates
+	go func() {
+		gateway.configManager.WatchConfig(func() {
+			log.Println("Configuration reloaded due to changes")
+			gateway.reloadRoutes()
+		})
+	}()
 
 	log.Println("Starting gateway on :8080")
 	if err := gateway.Run(8080); err != nil {

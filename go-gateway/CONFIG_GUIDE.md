@@ -211,3 +211,103 @@ If no external configuration file is loaded, the gateway will use default config
 ### Issue 3: Cannot Connect to Backend Service
 **Phenomenon**: `connection refused`
 **Solution**: Confirm backend service is running and network is reachable
+
+# 配置管理指南
+
+本文档介绍如何使用Viper进行配置管理。
+
+## 特性
+
+Viper提供了以下强大的配置管理功能：
+
+- **多种格式支持**: 支持JSON、YAML、TOML、INI、env文件等多种配置格式
+- **配置热更新**: 自动监听配置文件变化并重新加载
+- **远程配置**: 支持从远程配置中心（如etcd、Consul等）获取配置
+- **环境变量**: 无缝集成环境变量
+- **默认值**: 支持配置默认值
+
+## 配置文件格式
+
+Viper支持多种配置文件格式，以下是一个JSON格式的示例：
+
+```json
+{
+  "routes": [
+    {
+      "id": "api-route",
+      "uri": "http://localhost:9000",
+      "predicates": [
+        {
+          "name": "Path",
+          "args": {
+            "pattern": "/api/**"
+          }
+        }
+      ],
+      "filters": [
+        {
+          "name": "RateLimiter",
+          "args": {
+            "permitsPerSecond": 100,
+            "burstCapacity": 200
+          }
+        }
+      ],
+      "order": 1,
+      "metadata": {}
+    }
+  ],
+  "global_filters": [
+    {
+      "name": "GlobalLogFilter",
+      "args": {}
+    }
+  ],
+  "port": 8080
+}
+```
+
+## 在代码中使用
+
+``go
+package main
+
+import (
+    "log"
+    "go-gateway/pkg/config"
+)
+
+func main() {
+    // 创建Viper配置管理器
+    configManager := config.NewViperConfigManager()
+    
+    // 加载配置文件
+    err := configManager.Load("config.json")
+    if err != nil {
+        log.Fatal("Failed to load config:", err)
+    }
+    
+    // 获取配置
+    cfg := configManager.GetConfig()
+    log.Printf("Loaded config: %+v", cfg)
+    
+    // 监听配置变化（可选）
+    configManager.WatchConfig(func() {
+        log.Println("Config has been updated!")
+        // 在这里处理配置更新逻辑
+    })
+}
+```
+
+## 环境变量支持
+
+Viper还支持从环境变量读取配置。例如，可以通过以下环境变量覆盖配置：
+
+```bash
+export PORT=9090
+export GLOBAL_FILTERS_0_NAME=GlobalLogFilter
+```
+
+## 配置热更新
+
+网关支持配置热更新，当配置文件发生变化时，网关会自动重新加载配置而无需重启服务。

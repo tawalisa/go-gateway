@@ -7,8 +7,8 @@ import (
 	"go-gateway/pkg/common"
 )
 
-// TestStaticConfigManager tests static config manager
-func TestStaticConfigManager(t *testing.T) {
+// TestViperConfigManager tests viper config manager
+func TestViperConfigManager(t *testing.T) {
 	t.Run("TestLoadAndSaveConfig", func(t *testing.T) {
 		// Create temporary config file
 		tempConfigFile := "temp_config.json"
@@ -61,7 +61,7 @@ func TestStaticConfigManager(t *testing.T) {
 		}
 
 		// Create config manager and save config
-		configMgr := NewStaticConfigManager()
+		configMgr := NewViperConfigManager()
 		configMgr.SetConfig(testConfig)
 
 		err := configMgr.Save(tempConfigFile)
@@ -75,7 +75,7 @@ func TestStaticConfigManager(t *testing.T) {
 		}
 
 		// Create new config manager and load config
-		newConfigMgr := NewStaticConfigManager()
+		newConfigMgr := NewViperConfigManager()
 		err = newConfigMgr.Load(tempConfigFile)
 		if err != nil {
 			t.Fatalf("Failed to load config: %v", err)
@@ -100,7 +100,7 @@ func TestStaticConfigManager(t *testing.T) {
 	})
 
 	t.Run("TestAddRoute", func(t *testing.T) {
-		configMgr := NewStaticConfigManager()
+		configMgr := NewViperConfigManager()
 
 		initialRoutes := configMgr.GetRoutes()
 		if len(initialRoutes) != 0 {
@@ -133,7 +133,7 @@ func TestStaticConfigManager(t *testing.T) {
 	})
 
 	t.Run("TestDeleteRoute", func(t *testing.T) {
-		configMgr := NewStaticConfigManager()
+		configMgr := NewViperConfigManager()
 
 		// Add several routes
 		route1 := common.Route{
@@ -191,7 +191,7 @@ func TestStaticConfigManager(t *testing.T) {
 	})
 
 	t.Run("TestUpdateRoute", func(t *testing.T) {
-		configMgr := NewStaticConfigManager()
+		configMgr := NewViperConfigManager()
 
 		// 添加路由
 		initialRoute := common.Route{
@@ -260,6 +260,33 @@ func TestStaticConfigManager(t *testing.T) {
 		err = configMgr.UpdateRoute(nonExistentRoute)
 		if err == nil {
 			t.Error("Expected error when updating non-existent route")
+		}
+	})
+}
+
+// Test backward compatibility - still support old function name
+func TestStaticConfigManager(t *testing.T) {
+	t.Run("TestOldManagerStillWorks", func(t *testing.T) {
+		// Test that we can still create the old named manager
+		configMgr := NewViperConfigManager()
+
+		route := common.Route{
+			ID:  "test-compatibility",
+			URI: "http://test:8080",
+			Predicates: []common.Predicate{
+				{
+					Name: "Path",
+					Args: map[string]string{"pattern": "/test"},
+				},
+			},
+			Order: 1,
+		}
+
+		configMgr.AddRoute(route)
+		routes := configMgr.GetRoutes()
+
+		if len(routes) != 1 {
+			t.Errorf("Expected 1 route, got %d", len(routes))
 		}
 	})
 }

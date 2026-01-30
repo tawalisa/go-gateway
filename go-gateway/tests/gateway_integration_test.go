@@ -5,6 +5,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"go-gateway/pkg/common"
 	"go-gateway/pkg/config"
 	"go-gateway/pkg/loadbalancer"
 	"go-gateway/pkg/middleware"
@@ -15,21 +16,21 @@ import (
 func TestGatewayIntegration(t *testing.T) {
 	t.Run("TestBasicRoutingAndLoadBalancing", func(t *testing.T) {
 		// 创建配置管理器
-		configMgr := config.NewStaticConfigManager()
+		configMgr := config.NewViperConfigManager()
 
 		// 设置测试配置
 		testConfig := config.Config{
-			Routes: []config.Route{
+			Routes: []common.Route{
 				{
 					ID:  "service-a",
 					URI: "lb://service-a", // 使用负载均衡标识
-					Predicates: []config.Predicate{
+					Predicates: []common.Predicate{
 						{
 							Name: "Path",
 							Args: map[string]string{"pattern": "/api/service-a/**"},
 						},
 					},
-					Filters: []config.Filter{
+					Filters: []common.Filter{
 						{
 							Name: "RateLimiter",
 							Args: map[string]interface{}{
@@ -43,13 +44,21 @@ func TestGatewayIntegration(t *testing.T) {
 				{
 					ID:  "service-b",
 					URI: "http://specific-backend:8080",
-					Predicates: []config.Predicate{
+					Predicates: []common.Predicate{
 						{
 							Name: "Path",
 							Args: map[string]string{"pattern": "/api/service-b/**"},
 						},
 					},
 					Order: 2,
+				},
+			},
+			GlobalFilters: []config.GlobalFilter{
+				{
+					Name: "GlobalLogFilter",
+				},
+				{
+					Name: "GlobalMetricsFilter",
 				},
 			},
 			Port: 8080,
@@ -63,7 +72,7 @@ func TestGatewayIntegration(t *testing.T) {
 		// 从配置加载路由
 		for _, routeConfig := range configMgr.GetRoutes() {
 			// 转换配置路由到内部路由结构
-			internalRoute := &route.Route{
+			internalRoute := &common.Route{
 				ID:         routeConfig.ID,
 				URI:        routeConfig.URI,
 				Predicates: convertPredicates(routeConfig.Predicates),
@@ -116,7 +125,7 @@ func TestGatewayIntegration(t *testing.T) {
 
 	t.Run("TestRouteConfigurationManagement", func(t *testing.T) {
 		// 创建配置管理器
-		configMgr := config.NewStaticConfigManager()
+		configMgr := config.NewViperConfigManager()
 
 		// 初始路由数量
 		initialRoutes := configMgr.GetRoutes()
@@ -125,10 +134,10 @@ func TestGatewayIntegration(t *testing.T) {
 		}
 
 		// 添加路由
-		newRoute := config.Route{
+		newRoute := common.Route{
 			ID:  "dynamic-route",
 			URI: "http://dynamic-backend:8080",
-			Predicates: []config.Predicate{
+			Predicates: []common.Predicate{
 				{
 					Name: "Path",
 					Args: map[string]string{"pattern": "/api/dynamic/**"},
@@ -146,16 +155,16 @@ func TestGatewayIntegration(t *testing.T) {
 		}
 
 		// 更新路由
-		updatedRoute := config.Route{
+		updatedRoute := common.Route{
 			ID:  "dynamic-route",
 			URI: "http://updated-backend:8080",
-			Predicates: []config.Predicate{
+			Predicates: []common.Predicate{
 				{
 					Name: "Path",
 					Args: map[string]string{"pattern": "/api/updated/**"},
 				},
 			},
-			Filters: []config.Filter{
+			Filters: []common.Filter{
 				{
 					Name: "AuthFilter",
 					Args: map[string]interface{}{"required": true},
@@ -211,10 +220,10 @@ func TestGatewayIntegration(t *testing.T) {
 }
 
 // 辅助函数：转换谓词
-func convertPredicates(predicates []config.Predicate) []route.Predicate {
-	result := make([]route.Predicate, len(predicates))
+func convertPredicates(predicates []common.Predicate) []common.Predicate {
+	result := make([]common.Predicate, len(predicates))
 	for i, p := range predicates {
-		result[i] = route.Predicate{
+		result[i] = common.Predicate{
 			Name: p.Name,
 			Args: p.Args,
 		}
@@ -223,10 +232,10 @@ func convertPredicates(predicates []config.Predicate) []route.Predicate {
 }
 
 // 辅助函数：转换过滤器
-func convertFilters(filters []config.Filter) []route.Filter {
-	result := make([]route.Filter, len(filters))
+func convertFilters(filters []common.Filter) []common.Filter {
+	result := make([]common.Filter, len(filters))
 	for i, f := range filters {
-		result[i] = route.Filter{
+		result[i] = common.Filter{
 			Name: f.Name,
 			Args: f.Args,
 		}
@@ -238,17 +247,17 @@ func convertFilters(filters []config.Filter) []route.Filter {
 func TestConfigSerialization(t *testing.T) {
 	// 创建测试配置
 	testConfig := config.Config{
-		Routes: []config.Route{
+		Routes: []common.Route{
 			{
 				ID:  "serialized-route",
 				URI: "http://serialized-backend:8080",
-				Predicates: []config.Predicate{
+				Predicates: []common.Predicate{
 					{
 						Name: "Path",
 						Args: map[string]string{"pattern": "/api/serialize/**"},
 					},
 				},
-				Filters: []config.Filter{
+				Filters: []common.Filter{
 					{
 						Name: "RateLimiter",
 						Args: map[string]interface{}{
