@@ -1,0 +1,53 @@
+{
+  "routes": [
+    {
+      "id": "api-route",
+      "uri": "http://localhost:9000",
+      "predicates": [
+        {
+          "name": "Path",
+          "args": {
+            "pattern": "/api/**"
+          }
+        }
+      ],
+      "filters": [
+        {
+          "name": "RateLimiter",
+          "args": {
+            "permitsPerSecond": 100,
+            "burstCapacity": 200
+          }
+        }
+      ],
+      "order": 1,
+      "metadata": {}
+    },
+    {
+      "id": "web-route",
+      "uri": "http://localhost:8080",
+      "predicates": [
+        {
+          "name": "Path",
+          "args": {
+            "pattern": "/web/**"
+          }
+        }
+      ],
+      "filters": [],
+      "order": 2,
+      "metadata": {}
+    }
+  ],
+  "global_filters": [
+    {
+      "name": "GlobalLogFilter",
+      "args": {}
+    },
+    {
+      "name": "GlobalMetricsFilter",
+      "args": {}
+    }
+  ],
+  "port": 8080
+}
